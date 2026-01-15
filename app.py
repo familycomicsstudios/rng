@@ -13,11 +13,12 @@ load_dotenv()
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-CORS(app, supports_credentials=True, origins=['http://localhost:5000', 'http://127.0.0.1:5000'])
+CORS(app, supports_credentials=True, origins=['*'])
 
-DATABASE = 'rng_game.db'
+DATABASE = '/tmp/rng_game.db'
 
 def get_db():
     db = sqlite3.connect(DATABASE, timeout=10.0)
