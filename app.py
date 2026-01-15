@@ -35,7 +35,7 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
-                last_roll_time REAL DEFAULT 0
+                last_roll_time DOUBLE PRECISION DEFAULT NULL
             )
         ''')
         
@@ -74,6 +74,7 @@ def register():
     cur = conn.cursor()
     try:
         hashed_password = generate_password_hash(password)
+        # Don't set last_roll_time - let it be NULL so first roll is always allowed
         cur.execute('INSERT INTO users (username, password) VALUES (%s, %s)', 
                    (username, hashed_password))
         conn.commit()
@@ -177,14 +178,15 @@ def roll():
         
         # Check cooldown (10 seconds)
         cooldown_seconds = 10
-        last_roll = user['last_roll_time'] if user['last_roll_time'] else 0
-        time_since_last_roll = current_time - last_roll
+        last_roll = float(user['last_roll_time']) if user['last_roll_time'] else 0
+        time_since_luser['last_roll_time']
         
-        # If last_roll is 0 or very old, allow the roll
-        if last_roll > 0 and time_since_last_roll < cooldown_seconds:
-            remaining = cooldown_seconds - time_since_last_roll
-            return jsonify({'error': 'Cooldown active', 'remaining': remaining}), 429
-        
+        # If last_roll is None or cooldown has passed, allow the roll
+        if last_roll is not None:
+            time_since_last_roll = current_time - float(last_roll)
+            if time_since_last_roll < cooldown_seconds:
+                remaining = cooldown_seconds - time_since_last_roll
+            
         # Calculate RNG result
         base_rarity = calculate_rng_result()
         modifier_name, multiplier, gradient = calculate_modifier()
@@ -281,13 +283,14 @@ def get_cooldown():
     conn.close()
     
     cooldown_seconds = 10
-    last_roll = user['last_roll_time'] if user['last_roll_time'] else 0
-    time_since_last_roll = current_time - last_roll
+    last_roll = user['last_roll_time']
     
-    # If last_roll is 0 or very old, no cooldown
-    if last_roll > 0 and time_since_last_roll < cooldown_seconds:
-        remaining = cooldown_seconds - time_since_last_roll
-        return jsonify({'on_cooldown': True, 'remaining': remaining}), 200
+    # If last_roll is None or cooldown has passed, no cooldown
+    if last_roll is not None:
+        time_since_last_roll = current_time - float(last_roll)
+        if time_since_last_roll < cooldown_seconds:
+            remaining = cooldown_seconds - time_since_last_roll
+            return jsonify({'on_cooldown': True, 'remaining': remaining}), 200
     
     return jsonify({'on_cooldown': False, 'remaining': 0}), 200
 
