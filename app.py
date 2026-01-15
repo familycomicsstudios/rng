@@ -25,13 +25,7 @@ def get_db():
     conn = psycopg2.connect(DATABASE_URL)
     return conn
 
-db_initialized = False
-
 def init_db():
-    global db_initialized
-    if db_initialized:
-        return
-        
     with app.app_context():
         conn = get_db()
         cur = conn.cursor()
@@ -59,7 +53,9 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        db_initialized = True
+
+# Initialize database on startup (important for serverless)
+init_db()
 
 @app.route('/')
 def index():
@@ -67,7 +63,6 @@ def index():
 
 @app.route('/register', methods=['POST'])
 def register():
-    init_db()  # Ensure DB is initialized
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -91,8 +86,7 @@ def register():
         conn.close()
 
 @app.route('/login', methods=['POST'])
-def init_db()  # Ensure DB is initialized
-    login():
+def login():
     data = request.json
     username = data.get('username')
     password = data.get('password')
