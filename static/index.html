@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RNG</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="auth-container" class="container">
+        <div class="auth-box">
+            <h1>RNG</h1>
+            <div id="login-form">
+                <h2>Login</h2>
+                <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+                <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                <button onclick="login()">Login</button>
+                <p>Don't have an account? <a href="#" onclick="showRegister()">Register</a></p>
+            </div>
+            <div id="register-form" style="display: none;">
+                <h2>Register</h2>
+                <input type="text" id="register-username" placeholder="Username" autocomplete="username">
+                <input type="password" id="register-password" placeholder="Password" autocomplete="new-password">
+                <button onclick="register()">Register</button>
+                <p>Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
+            </div>
+            <div id="auth-message"></div>
+        </div>
+    </div>
+
+    <div id="game-container" class="container" style="display: none;">
+        <div class="game-box">
+            <div class="header">
+                <h1>RNG</h1>
+                <div class="user-info">
+                    <span id="username-display"></span>
+                    <button onclick="logout()" class="logout-btn">Logout</button>
+                </div>
+            </div>
+
+            <p class="info-text">Roll for rarities! Base chances: 1 in 2 (50%), 1 in 3 (33%), 1 in 4 (25%), etc.<br>Modifiers: Holographic (10%), Polychrome (1%), Negative (0.1%), Developer (0.001%).</p>
+
+            <div class="roll-section">
+                <button id="roll-btn" onclick="roll()" class="roll-button">
+                    Roll RNG
+                </button>
+                <div id="cooldown-display" class="cooldown"></div>
+            </div>
+
+            <div id="last-roll" class="last-roll"></div>
+
+            <div class="inventory-section">
+                <h2>Your Inventory</h2>
+                <div id="inventory-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
