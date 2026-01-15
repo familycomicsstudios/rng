@@ -181,11 +181,13 @@ def roll():
         last_roll = user['last_roll_time']
         
         # If last_roll is None or cooldown has passed, allow the roll
+        # If last_roll is set, enforce cooldown with modulo to handle skew
         if last_roll is not None:
             time_since_last_roll = current_time - float(last_roll)
-            # Handle clock skew - if negative, allow the roll
+            # Only enforce when time has progressed; handle negative skew by allowing roll
             if time_since_last_roll >= 0 and time_since_last_roll < cooldown_seconds:
-                remaining = cooldown_seconds - time_since_last_roll
+                # Modulo to cap remaining within [0, cooldown_seconds)
+                remaining = (cooldown_seconds - time_since_last_roll) % cooldown_seconds
                 return jsonify({'error': 'Cooldown active', 'remaining': remaining}), 429
             
         # Calculate RNG result
@@ -286,11 +288,12 @@ def get_cooldown():
     cooldown_seconds = 10
     last_roll = user['last_roll_time']
     
-    # If last_roll is None or cooldown has passed, no cooldown
+    # If last_roll is set, compute remaining with modulo and handle skew
     if last_roll is not None:
         time_since_last_roll = current_time - float(last_roll)
-        if time_since_last_roll < cooldown_seconds:
-            remaining = cooldown_seconds - time_since_last_roll
+        # Only show cooldown when time has progressed; negative skew -> no cooldown
+        if time_since_last_roll >= 0 and time_since_last_roll < cooldown_seconds:
+            remaining = (cooldown_seconds - time_since_last_roll) % cooldown_seconds
             return jsonify({'on_cooldown': True, 'remaining': remaining}), 200
     
     return jsonify({'on_cooldown': False, 'remaining': 0}), 200
