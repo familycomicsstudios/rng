@@ -178,14 +178,14 @@ def roll():
         
         # Check cooldown (10 seconds)
         cooldown_seconds = 10
-        last_roll = float(user['last_roll_time']) if user['last_roll_time'] else 0
-        time_since_luser['last_roll_time']
+        last_roll = user['last_roll_time']
         
         # If last_roll is None or cooldown has passed, allow the roll
         if last_roll is not None:
             time_since_last_roll = current_time - float(last_roll)
             if time_since_last_roll < cooldown_seconds:
                 remaining = cooldown_seconds - time_since_last_roll
+                return jsonify({'error': 'Cooldown active', 'remaining': remaining}), 429
             
         # Calculate RNG result
         base_rarity = calculate_rng_result()
