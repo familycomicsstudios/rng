@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
 import psycopg2
 import psycopg2.extras
 import random
@@ -20,93 +19,49 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 CORS(app, supports_credentials=True, origins=['*'])
 
-# Detect if running on Vercel
-IS_VERCEL = os.getenv('VERCEL') == '1'
-DATABASE_URL = os.getenv('POSTGRES_URL')
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-if IS_VERCEL and DATABASE_URL:
-    USE_POSTGRES = True
-else:
-    USE_POSTGRES = False
-    DATAcursor = db.cursor()
+def get_db():
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+def init_db():
+    with app.app_context():
+        conn = get_db()
+        cur = conn.cursor()
         
-        if USE_POSTGRES:
-            # PostgreSQL syntax
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    last_roll_time DOUBLE PRECISION DEFAULT 0
-                )
-            ''')
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS inventory (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL,
-                    rarity BIGINT NOT NULL,
-                    modifier TEXT DEFAULT NULL,
-                    count INTEGER DEFAULT 1,
-                    FOREIGN KEY (user_id) REFERENCES users(id),
-                    UNIQUE(user_id, rarity, modifier)
-                )
-            ''')
-        else:
-            # SQLite syntax
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    last_roll_time REAL DEFAULT 0
-                )
-            ''')
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS inventory (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    rarity INTEGER NOT NULL,
-                    modifier TEXT DEFAULT NULL,
-                    count INTEGER DEFAULT 1,
-                    FOREIGN KEY (user_id) REFERENCES users(id),
-                    UNIQUE(user_id, rarity, modifier)
-                )
-            ''')
-            
-            # Migration: Add modifier column to existing inventory table if it doesn't exist (SQLite only)
-            try:
-                cursor.execute('SELECT modifier FROM inventory LIMIT 1')
-            except sqlite3.OperationalError:
-                cursor.execute('ALTER TABLE inventory ADD COLUMN modifier TEXT DEFAULT NULL')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                last_roll_time REAL DEFAULT 0
+            )
+        ''')
         
-        db.commit()
-        cursor.close
-        # Migration: Add modifier column to existing inventory table if it doesn't exist
-        try:
-            db.execute('SELECT modifier FROM inventory LIMIT 1')
-        except sqlite3.OperationalError:
-            # Column doesn't exist, add it
-            db.execute('ALTER TABLE inventory ADD COLUMN modifier TEXT DEFAULT NULL')
-            # Drop old unique constraint and recreate with modifier
-            db.execute('DROP INDEX IF EXISTS sqlite_autoindex_inventory_1')
-            # SQLite doesn't allow dropping constraints, so we need to recreate the table
-            db.execute('CREATE TABLE inventory_new (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, rarity INTEGER NOT NULL, modifier TEXT DEFAULT NULL, count INTEGER DEFAULT 1, FOREIGN KEY (user_id) REFERENCES users(id), UNIQUE(user_id, rarity, modifier))')
-            db.execute('INSERT INTO inventory_new (id, user_id, rarity, count, modifier) SELECT id, user_id, rarity, count, NULL FROM inventory')
-            db.execute('DROP TABLE inventory')
-            db.execute('ALTER TABLE inventory_new RENAME TO inventory')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS inventory (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                rarity BIGINT NOT NULL,
+                modifier TEXT DEFAULT NULL,
+                count INTEGER DEFAULT 1,
+                UNIQUE(user_id, rarity, modifier)
+            )
+        ''')
         
-        db.commit()
-cursor = db.cursor()
-    try:
-        hashed_password = generate_password_hash(password)
-        cursor.execute('INSERT INTO users (username, password) VALUES (%s, %s)' if USE_POSTGRES else 'INSERT INTO users (username, password) VALUES (?, ?)', 
-                   (username, hashed_password))
-        db.commit()
-        return jsonify({'message': 'User created successfully'}), 201
-    except (sqlite3.IntegrityError, psycopg2.IntegrityError):
-        return jsonify({'error': 'Username already exists'}), 400
-    finally:
-        cursor.close()/register', methods=['POST'])
+        conn.commit()
+        cur.close()
+        conn.close()
+
+# Initialize database on startup (important for serverless)
+init_db()
+
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/register', methods=['POST'])
 def register():
     data = request.json
     username = data.get('username')
@@ -115,20 +70,20 @@ def register():
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
     
-    db = get_db()
+    conn = get_db()
+    cur = conn.cursor()
     try:
-    cursor = db.cursor()
-    cursor.execute('SELECT * FROM users WHERE username = %s' if USE_POSTGRES else 'SELECT * FROM users WHERE username = ?', (username,))
-    user = cursor.fetchone()
-    cursor.clos
-        db.execute('INSERT INTO users (username, password) VALUES (?, ?)', 
+        hashed_password = generate_password_hash(password)
+        cur.execute('INSERT INTO users (username, password) VALUES (%s, %s)', 
                    (username, hashed_password))
-        db.commit()
+        conn.commit()
         return jsonify({'message': 'User created successfully'}), 201
-    except sqlite3.IntegrityError:
+    except psycopg2.IntegrityError:
+        conn.rollback()
         return jsonify({'error': 'Username already exists'}), 400
     finally:
-        db.close()
+        cur.close()
+        conn.close()
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -139,9 +94,12 @@ def login():
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
     
-    db = get_db()
-    user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
-    db.close()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM users WHERE username = %s', (username,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
     
     if user and check_password_hash(user['password'], password):
         session['user_id'] = user['id']
@@ -211,12 +169,11 @@ def roll():
     user_id = session['user_id']
     current_time = time.time()
     
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        param = '%s' if USE_POSTGRES else '?'
-        cursor.execute(f'SELECT last_roll_time FROM users WHERE id = {param}', (user_id,))
-        user = cursor.fetchone()
+        cur.execute('SELECT last_roll_time FROM users WHERE id = %s', (user_id,))
+        user = cur.fetchone()
         
         # Check cooldown (10 seconds)
         cooldown_seconds = 10
@@ -232,29 +189,30 @@ def roll():
         true_rarity = base_rarity * multiplier
         
         # Update last roll time
-        cursor.execute(f'UPDATE users SET last_roll_time = {param} WHERE id = {param}', (current_time, user_id))
+        cur.execute('UPDATE users SET last_roll_time = %s WHERE id = %s', (current_time, user_id))
         
         # Add to inventory - handle NULL modifier comparison properly
         if modifier_name:
-            cursor.execute(f'SELECT * FROM inventory WHERE user_id = {param} AND rarity = {param} AND modifier = {param}', 
-                          (user_id, true_rarity, modifier_name))
+            cur.execute('SELECT * FROM inventory WHERE user_id = %s AND rarity = %s AND modifier = %s', 
+                       (user_id, true_rarity, modifier_name))
+            existing = cur.fetchone()
         else:
-            cursor.execute(f'SELECT * FROM inventory WHERE user_id = {param} AND rarity = {param} AND modifier IS NULL', 
-                          (user_id, true_rarity))
-        existing = cursor.fetchone()
+            cur.execute('SELECT * FROM inventory WHERE user_id = %s AND rarity = %s AND modifier IS NULL', 
+                       (user_id, true_rarity))
+            existing = cur.fetchone()
         
         if existing:
             if modifier_name:
-                cursor.execute(f'UPDATE inventory SET count = count + 1 WHERE user_id = {param} AND rarity = {param} AND modifier = {param}',
+                cur.execute('UPDATE inventory SET count = count + 1 WHERE user_id = %s AND rarity = %s AND modifier = %s',
                            (user_id, true_rarity, modifier_name))
             else:
-                cursor.execute(f'UPDATE inventory SET count = count + 1 WHERE user_id = {param} AND rarity = {param} AND modifier IS NULL',
+                cur.execute('UPDATE inventory SET count = count + 1 WHERE user_id = %s AND rarity = %s AND modifier IS NULL',
                            (user_id, true_rarity))
         else:
-            cursor.execute(f'INSERT INTO inventory (user_id, rarity, modifier, count) VALUES ({param}, {param}, {param}, 1)',
+            cur.execute('INSERT INTO inventory (user_id, rarity, modifier, count) VALUES (%s, %s, %s, 1)',
                        (user_id, true_rarity, modifier_name))
         
-        db.commit()
+        conn.commit()
         
         return jsonify({
             'rarity': true_rarity,
@@ -263,8 +221,8 @@ def roll():
             'message': f'You got a {modifier_name + " " if modifier_name else ""}1 in {true_rarity}!'
         }), 200
     finally:
-        cursor.close()
-        db.close()
+        cur.close()
+        conn.close()
 
 @app.route('/inventory', methods=['GET'])
 def get_inventory():
@@ -272,20 +230,19 @@ def get_inventory():
         return jsonify({'error': 'Not authenticated'}), 401
     
     user_id = session['user_id']
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
-    param = '%s' if USE_POSTGRES else '?'
     # Get inventory sorted by rarity (rarest first)
-    cursor.execute(f'''
+    cur.execute('''
         SELECT rarity, modifier, count FROM inventory 
-        WHERE user_id = {param}
+        WHERE user_id = %s 
         ORDER BY rarity DESC
     ''', (user_id,))
-    items = cursor.fetchall()
+    items = cur.fetchall()
     
-    cursor.close()
-    db.close()
+    cur.close()
+    conn.close()
     
     inventory = []
     for item in items:
@@ -311,16 +268,15 @@ def get_cooldown():
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
     
-    cursor = db.cursor()
-    param = '%s' if USE_POSTGRES else '?'
-    cursor.execute(f'SELECT last_roll_time FROM users WHERE id = {param}', (user_id,))
-    user = cursor.fetchone()
-    cursor.clos
+    user_id = session['user_id']
     current_time = time.time()
     
-    db = get_db()
-    user = db.execute('SELECT last_roll_time FROM users WHERE id = ?', (user_id,)).fetchone()
-    db.close()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT last_roll_time FROM users WHERE id = %s', (user_id,))
+    user = cur.fetchone()
+    cur.close()
+    conn.close()
     
     cooldown_seconds = 10
     time_since_last_roll = current_time - user['last_roll_time']
