@@ -250,7 +250,10 @@ def get_inventory():
             'count': item['count']
         })
     
-    return jsonify({'inventory': inventory}), 200
+    # Get rarest item
+    rarest_rarity = items[0]['rarity'] if items else 0
+    
+    return jsonify({'inventory': inventory, 'rarest': rarest_rarity}), 200
 
 @app.route('/cooldown', methods=['GET'])
 def get_cooldown():

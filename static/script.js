@@ -1,6 +1,8 @@
 const API_URL = '';  // Use relative URLs to avoid cross-origin issues
 let cooldownInterval = null;
 let lastRollResult = null;
+let autoRollEnabled = false;
+let autoRollTimeout = null;
 
 // Check session on load
 window.onload = async () => {
@@ -123,8 +125,13 @@ async function logout() {
         
         showAuth();
         lastRollResult = null;
+        autoRollEnabled = false;
+        document.getElementById('auto-roll-toggle').checked = false;
         if (cooldownInterval) {
             clearInterval(cooldownInterval);
+        }
+        if (autoRollTimeout) {
+            clearTimeout(autoRollTimeout);
         }
     } catch (error) {
         console.error('Error logging out:', error);
@@ -181,6 +188,24 @@ async function roll() {
         console.error('Error rolling:', error);
         alert('Error connecting to server');
         button.disabled = false;
+    }
+}
+
+function toggleAutoRoll() {
+    autoRollEnabled = document.getElementById('auto-roll-toggle').checked;
+    
+    if (autoRollEnabled) {
+        // Try to roll immediately if not on cooldown
+        const button = document.getElementById('roll-btn');
+        if (!button.disabled) {
+            roll();
+        }
+    } else {
+        // Cancel any pending auto roll
+        if (autoRollTimeout) {
+            clearTimeout(autoRollTimeout);
+            autoRollTimeout = null;
+        }
     }
 }
 
@@ -289,6 +314,13 @@ function startCooldown(seconds) {
             clearInterval(cooldownInterval);
             button.disabled = false;
             cooldownDisplay.textContent = '';
+            
+            // If auto-roll is enabled, schedule next roll
+            if (autoRollEnabled) {
+                autoRollTimeout = setTimeout(() => {
+                    roll();
+                }, 100);
+            }
         } else {
             cooldownDisplay.textContent = `Cooldown: ${remaining.toFixed(1)}s`;
         }

@@ -186,6 +186,27 @@ a:hover {
     min-height: 25px;
 }
 
+.auto-roll-container {
+    margin-top: 20px;
+}
+
+.auto-roll-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    color: #667eea;
+    font-weight: bold;
+}
+
+.auto-roll-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
 .last-roll {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
