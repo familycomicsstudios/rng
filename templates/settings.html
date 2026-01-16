@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - RNG{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="settings-box">
+        <div class="settings-header">
+            <a href="/" class="back-link">← Back to Game</a>
+            <h1>Settings</h1>
+        </div>
+
+        <div class="settings-section">
+            <h2>Change Username</h2>
+            <div class="settings-form">
+                <input type="text" id="new-username" placeholder="New Username">
+                <button onclick="changeUsername()" class="settings-btn">Update Username</button>
+            </div>
+            <div id="username-message" class="settings-message"></div>
+        </div>
+
+        <div class="settings-section">
+            <h2>Change Password</h2>
+            <div class="settings-form">
+                <input type="password" id="current-password" placeholder="Current Password" autocomplete="current-password">
+                <input type="password" id="new-password" placeholder="New Password" autocomplete="new-password">
+                <input type="password" id="confirm-password" placeholder="Confirm New Password" autocomplete="new-password">
+                <button onclick="changePassword()" class="settings-btn">Update Password</button>
+            </div>
+            <div id="password-message" class="settings-message"></div>
+        </div>
+
+        <div class="settings-section danger-zone">
+            <h2>Danger Zone</h2>
+            <p class="warning-text">This action cannot be undone. All your data will be permanently deleted.</p>
+            <div class="settings-form">
+                <input type="password" id="delete-password" placeholder="Enter Password to Confirm" autocomplete="current-password">
+                <button onclick="deleteAccount()" class="settings-btn danger-btn">Delete Account</button>
+            </div>
+            <div id="delete-message" class="settings-message"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function changeUsername() {
+    const newUsername = document.getElementById('new-username').value;
+    const messageDiv = document.getElementById('username-message');
+    
+    if (!newUsername) {
+        messageDiv.textContent = 'Please enter a new username';
+        messageDiv.style.color = '#ff6b6b';
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/change-username', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_username: newUsername })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            messageDiv.textContent = 'Username updated successfully!';
+            messageDiv.style.color = '#51cf66';
+            document.getElementById('new-username').value = '';
+        } else {
+            messageDiv.textContent = data.error || 'Failed to update username';
+            messageDiv.style.color = '#ff6b6b';
+        }
+    } catch (error) {
+        messageDiv.textContent = 'Error updating username';
+        messageDiv.style.color = '#ff6b6b';
+    }
+}
+
+async function changePassword() {
+    const currentPassword = document.getElementById('current-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    const messageDiv = document.getElementById('password-message');
+    
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        messageDiv.textContent = 'Please fill all password fields';
+        messageDiv.style.color = '#ff6b6b';
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        messageDiv.textContent = 'New passwords do not match';
+        messageDiv.style.color = '#ff6b6b';
+        return;
+    }
+    
+    if (newPassword.length < 3) {
+        messageDiv.textContent = 'Password must be at least 3 characters';
+        messageDiv.style.color = '#ff6b6b';
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                current_password: currentPassword,
+                new_password: newPassword
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            messageDiv.textContent = 'Password updated successfully!';
+            messageDiv.style.color = '#51cf66';
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        } else {
+            messageDiv.textContent = data.error || 'Failed to update password';
+            messageDiv.style.color = '#ff6b6b';
+        }
+    } catch (error) {
+        messageDiv.textContent = 'Error updating password';
+        messageDiv.style.color = '#ff6b6b';
+    }
+}
+
+async function deleteAccount() {
+    const password = document.getElementById('delete-password').value;
+    const messageDiv = document.getElementById('delete-message');
+    
+    if (!password) {
+        messageDiv.textContent = 'Please enter your password to confirm';
+        messageDiv.style.color = '#ff6b6b';
+        return;
+    }
+    
+    if (!confirm('Are you absolutely sure? This action cannot be undone!')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/delete-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            messageDiv.textContent = 'Account deleted. Redirecting...';
+            messageDiv.style.color = '#51cf66';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+        } else {
+            messageDiv.textContent = data.error || 'Failed to delete account';
+            messageDiv.style.color = '#ff6b6b';
+        }
+    } catch (error) {
+        messageDiv.textContent = 'Error deleting account';
+        messageDiv.style.color = '#ff6b6b';
+    }
+}
+</script>
+{% endblock %}

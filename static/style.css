@@ -301,3 +301,109 @@ a:hover {
 #inventory-list::-webkit-scrollbar-thumb:hover {
     background: #764ba2;
 }
+
+/* Settings page styles */
+.settings-box {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: none;
+}
+
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 30px;
+}
+
+.back-link {
+    color: #667eea;
+    font-weight: bold;
+    font-size: 16px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+
+.back-link:hover {
+    transform: translateX(-5px);
+}
+
+.settings-section {
+    margin: 30px 0;
+    padding: 25px;
+    background: #f5f5f5;
+    border-radius: 12px;
+}
+
+.settings-section h2 {
+    color: #667eea;
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.settings-btn {
+    width: auto;
+    padding: 12px 30px;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+.settings-message {
+    margin-top: 15px;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    min-height: 20px;
+}
+
+.danger-zone {
+    background: #ffebee;
+    border: 2px solid #ef5350;
+}
+
+.danger-zone h2 {
+    color: #c62828;
+}
+
+.warning-text {
+    color: #c62828;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.danger-btn {
+    background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);
+}
+
+.danger-btn:hover {
+    box-shadow: 0 5px 15px rgba(198, 40, 40, 0.4);
+}
+
+.username-link {
+    color: #667eea;
+    font-weight: bold;
+    font-size: 14px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.username-link:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}

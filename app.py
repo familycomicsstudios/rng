@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session, send_from_directory
+from flask import Flask, request, jsonify, session, send_from_directory, render_template
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
@@ -59,7 +59,13 @@ init_db()
 
 @app.route('/')
 def index():
-    return send_from_directory('static', 'index.html')
+    return render_template('home.html')
+
+@app.route('/settings')
+def settings():
+    if 'user_id' not in session:
+        return render_template('home.html')
+    return render_template('settings.html')
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -297,6 +303,123 @@ def get_cooldown():
             return jsonify({'on_cooldown': True, 'remaining': remaining}), 200
     
     return jsonify({'on_cooldown': False, 'remaining': 0}), 200
+
+@app.route('/api/change-username', methods=['POST'])
+def change_username():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    new_username = data.get('new_username')
+    
+    if not new_username:
+        return jsonify({'error': 'New username required'}), 400
+    
+    if len(new_username) < 3:
+        return jsonify({'error': 'Username must be at least 3 characters'}), 400
+    
+    user_id = session['user_id']
+    conn = get_db()
+    cur = conn.cursor()
+    
+    try:
+        # Check if username already exists
+        cur.execute('SELECT id FROM users WHERE username = %s AND id != %s', (new_username, user_id))
+        if cur.fetchone():
+            return jsonify({'error': 'Username already taken'}), 400
+        
+        # Update username
+        cur.execute('UPDATE users SET username = %s WHERE id = %s', (new_username, user_id))
+        conn.commit()
+        
+        return jsonify({'message': 'Username updated successfully'}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': 'Database error'}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'Current and new passwords required'}), 400
+    
+    if len(new_password) < 3:
+        return jsonify({'error': 'Password must be at least 3 characters'}), 400
+    
+    user_id = session['user_id']
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Verify current password
+        cur.execute('SELECT password FROM users WHERE id = %s', (user_id,))
+        user = cur.fetchone()
+        
+        if not user or not check_password_hash(user['password'], current_password):
+            return jsonify({'error': 'Current password is incorrect'}), 400
+        
+        # Update password
+        hashed_password = generate_password_hash(new_password)
+        cur.execute('UPDATE users SET password = %s WHERE id = %s', (hashed_password, user_id))
+        conn.commit()
+        
+        return jsonify({'message': 'Password updated successfully'}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': 'Database error'}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/delete-account', methods=['POST'])
+def delete_account():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    password = data.get('password')
+    
+    if not password:
+        return jsonify({'error': 'Password required'}), 400
+    
+    user_id = session['user_id']
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Verify password
+        cur.execute('SELECT password FROM users WHERE id = %s', (user_id,))
+        user = cur.fetchone()
+        
+        if not user or not check_password_hash(user['password'], password):
+            return jsonify({'error': 'Password is incorrect'}), 400
+        
+        # Delete inventory first (foreign key constraint)
+        cur.execute('DELETE FROM inventory WHERE user_id = %s', (user_id,))
+        
+        # Delete user
+        cur.execute('DELETE FROM users WHERE id = %s', (user_id,))
+        conn.commit()
+        
+        # Clear session
+        session.clear()
+        
+        return jsonify({'message': 'Account deleted successfully'}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': 'Database error'}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == '__main__':
     init_db()
