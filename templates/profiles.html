@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Profiles - RNG{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="profiles-box">
+        <div class="profiles-header">
+            <a href="/" class="back-link">← Back to Game</a>
+            <h1>User Profiles</h1>
+        </div>
+
+        <div class="search-section">
+            <h2>Search for a User</h2>
+            <div class="search-form">
+                <input type="text" id="search-username" placeholder="Enter username" onkeypress="if(event.key === 'Enter') searchProfile()">
+                <button onclick="searchProfile()" class="search-btn">Search</button>
+            </div>
+            <div id="search-message" class="search-message"></div>
+        </div>
+
+        <div id="profile-display" class="profile-display" style="display: none;">
+            <div class="profile-card">
+                <div class="profile-header">
+                    <h2 id="profile-username"></h2>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Items</div>
+                        <div class="stat-value" id="profile-total-items">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Unique Rarities</div>
+                        <div class="stat-value" id="profile-unique-rarities">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Rarest Item</div>
+                        <div class="stat-value" id="profile-rarest-item">-</div>
+                    </div>
+                </div>
+
+                <div class="top-items-section">
+                    <h3>Top 10 Rarest Items</h3>
+                    <div id="profile-top-items"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function searchProfile() {
+    const username = document.getElementById('search-username').value.trim();
+    const messageDiv = document.getElementById('search-message');
+    const profileDisplay = document.getElementById('profile-display');
+    
+    if (!username) {
+        messageDiv.textContent = 'Please enter a username';
+        messageDiv.style.color = '#ff6b6b';
+        profileDisplay.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/profile/${encodeURIComponent(username)}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            messageDiv.textContent = '';
+            displayProfile(data);
+        } else {
+            messageDiv.textContent = data.error || 'User not found';
+            messageDiv.style.color = '#ff6b6b';
+            profileDisplay.style.display = 'none';
+        }
+    } catch (error) {
+        messageDiv.textContent = 'Error searching for user';
+        messageDiv.style.color = '#ff6b6b';
+        profileDisplay.style.display = 'none';
+    }
+}
+
+function displayProfile(data) {
+    document.getElementById('profile-username').textContent = data.username;
+    document.getElementById('profile-total-items').textContent = data.total_items.toLocaleString();
+    document.getElementById('profile-unique-rarities').textContent = data.unique_rarities.toLocaleString();
+    
+    // Display rarest item
+    const rarestDiv = document.getElementById('profile-rarest-item');
+    if (data.rarest_rarity > 0) {
+        const modifierText = data.rarest_modifier ? `${data.rarest_modifier} ` : '';
+        rarestDiv.textContent = `${modifierText}1 in ${data.rarest_rarity.toLocaleString()}`;
+        
+        // Apply gradient if modifier exists
+        if (data.rarest_modifier) {
+            const gradients = {
+                'Holographic': 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%)',
+                'Polychrome': 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
+                'Negative': 'linear-gradient(135deg, #2c3e50 0%, #000000 100%)',
+                'Developer': 'linear-gradient(135deg, #FFD700 0%, #FF8C00 50%, #FF1493 100%)'
+            };
+            rarestDiv.style.background = gradients[data.rarest_modifier] || '';
+            rarestDiv.style.webkitBackgroundClip = 'text';
+            rarestDiv.style.webkitTextFillColor = 'transparent';
+            rarestDiv.style.fontWeight = 'bold';
+        } else {
+            rarestDiv.style.background = '';
+            rarestDiv.style.webkitBackgroundClip = '';
+            rarestDiv.style.webkitTextFillColor = '';
+        }
+    } else {
+        rarestDiv.textContent = 'No items yet';
+        rarestDiv.style.background = '';
+        rarestDiv.style.webkitBackgroundClip = '';
+        rarestDiv.style.webkitTextFillColor = '';
+    }
+    
+    // Display top items
+    const topItemsDiv = document.getElementById('profile-top-items');
+    if (data.top_items && data.top_items.length > 0) {
+        topItemsDiv.innerHTML = data.top_items.map(item => {
+            const modifierText = item.modifier ? `${item.modifier} ` : '';
+            const gradients = {
+                'Holographic': 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%)',
+                'Polychrome': 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
+                'Negative': 'linear-gradient(135deg, #2c3e50 0%, #000000 100%)',
+                'Developer': 'linear-gradient(135deg, #FFD700 0%, #FF8C00 50%, #FF1493 100%)'
+            };
+            const gradient = item.modifier ? gradients[item.modifier] : '';
+            const gradientStyle = gradient ? `background: ${gradient}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold;` : '';
+            
+            return `
+                <div class="profile-inventory-item">
+                    <span class="profile-rarity-badge" style="${gradientStyle}">${modifierText}1 in ${item.rarity.toLocaleString()}</span>
+                    <span class="profile-count-badge">x${item.count}</span>
+                </div>
+            `;
+        }).join('');
+    } else {
+        topItemsDiv.innerHTML = '<div class="empty-inventory">No items yet</div>';
+    }
+    
+    document.getElementById('profile-display').style.display = 'block';
+}
+</script>
+{% endblock %}

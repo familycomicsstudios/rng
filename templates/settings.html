@@ -10,6 +10,24 @@
             <h1>Settings</h1>
         </div>
 
+        <div class="stats-overview">
+            <h2>Your Stats</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Items</div>
+                    <div class="stat-value" id="stats-total-items">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Unique Rarities</div>
+                    <div class="stat-value" id="stats-unique-rarities">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Rarest Item</div>
+                    <div class="stat-value" id="stats-rarest-item">-</div>
+                </div>
+            </div>
+        </div>
+
         <div class="settings-section">
             <h2>Change Username</h2>
             <div class="settings-form">
@@ -43,6 +61,45 @@
 </div>
 
 <script>
+// Load user stats on page load
+async function loadUserStats() {
+    try {
+        const response = await fetch('/api/user-stats');
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('stats-total-items').textContent = data.total_items.toLocaleString();
+            document.getElementById('stats-unique-rarities').textContent = data.unique_rarities.toLocaleString();
+            
+            const rarestDiv = document.getElementById('stats-rarest-item');
+            if (data.rarest_rarity > 0) {
+                const modifierText = data.rarest_modifier ? `${data.rarest_modifier} ` : '';
+                rarestDiv.textContent = `${modifierText}1 in ${data.rarest_rarity.toLocaleString()}`;
+                
+                // Apply gradient if modifier exists
+                if (data.rarest_modifier) {
+                    const gradients = {
+                        'Holographic': 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%)',
+                        'Polychrome': 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
+                        'Negative': 'linear-gradient(135deg, #2c3e50 0%, #000000 100%)',
+                        'Developer': 'linear-gradient(135deg, #FFD700 0%, #FF8C00 50%, #FF1493 100%)'
+                    };
+                    rarestDiv.style.background = gradients[data.rarest_modifier] || '';
+                    rarestDiv.style.webkitBackgroundClip = 'text';
+                    rarestDiv.style.webkitTextFillColor = 'transparent';
+                    rarestDiv.style.fontWeight = 'bold';
+                }
+            } else {
+                rarestDiv.textContent = 'No items yet';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Load stats when page loads
+loadUserStats();
+
 async function changeUsername() {
     const newUsername = document.getElementById('new-username').value;
     const messageDiv = document.getElementById('username-message');

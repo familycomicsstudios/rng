@@ -67,6 +67,12 @@ def settings():
         return render_template('home.html')
     return render_template('settings.html')
 
+@app.route('/profiles')
+def profiles():
+    if 'user_id' not in session:
+        return render_template('home.html')
+    return render_template('profiles.html')
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
@@ -303,6 +309,96 @@ def get_cooldown():
             return jsonify({'on_cooldown': True, 'remaining': remaining}), 200
     
     return jsonify({'on_cooldown': False, 'remaining': 0}), 200
+
+@app.route('/api/user-stats', methods=['GET'])
+def get_user_stats():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    user_id = session['user_id']
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Get username
+        cur.execute('SELECT username FROM users WHERE id = %s', (user_id,))
+        user = cur.fetchone()
+        
+        # Get total items count
+        cur.execute('SELECT COALESCE(SUM(count), 0) as total FROM inventory WHERE user_id = %s', (user_id,))
+        total_items = cur.fetchone()['total']
+        
+        # Get unique rarities count
+        cur.execute('SELECT COUNT(DISTINCT rarity) as unique_count FROM inventory WHERE user_id = %s', (user_id,))
+        unique_rarities = cur.fetchone()['unique_count']
+        
+        # Get rarest item
+        cur.execute('SELECT rarity, modifier FROM inventory WHERE user_id = %s ORDER BY rarity DESC LIMIT 1', (user_id,))
+        rarest = cur.fetchone()
+        rarest_rarity = rarest['rarity'] if rarest else 0
+        rarest_modifier = rarest['modifier'] if rarest else None
+        
+        return jsonify({
+            'username': user['username'],
+            'total_items': int(total_items),
+            'unique_rarities': int(unique_rarities),
+            'rarest_rarity': int(rarest_rarity),
+            'rarest_modifier': rarest_modifier
+        }), 200
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/profile/<username>', methods=['GET'])
+def get_profile(username):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Get user by username
+        cur.execute('SELECT id, username FROM users WHERE username = %s', (username,))
+        user = cur.fetchone()
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user_id = user['id']
+        
+        # Get total items count
+        cur.execute('SELECT COALESCE(SUM(count), 0) as total FROM inventory WHERE user_id = %s', (user_id,))
+        total_items = cur.fetchone()['total']
+        
+        # Get unique rarities count
+        cur.execute('SELECT COUNT(DISTINCT rarity) as unique_count FROM inventory WHERE user_id = %s', (user_id,))
+        unique_rarities = cur.fetchone()['unique_count']
+        
+        # Get rarest item
+        cur.execute('SELECT rarity, modifier FROM inventory WHERE user_id = %s ORDER BY rarity DESC LIMIT 1', (user_id,))
+        rarest = cur.fetchone()
+        rarest_rarity = rarest['rarity'] if rarest else 0
+        rarest_modifier = rarest['modifier'] if rarest else None
+        
+        # Get top 10 items
+        cur.execute('''
+            SELECT rarity, modifier, count 
+            FROM inventory 
+            WHERE user_id = %s 
+            ORDER BY rarity DESC 
+            LIMIT 10
+        ''', (user_id,))
+        top_items = cur.fetchall()
+        
+        return jsonify({
+            'username': user['username'],
+            'total_items': int(total_items),
+            'unique_rarities': int(unique_rarities),
+            'rarest_rarity': int(rarest_rarity),
+            'rarest_modifier': rarest_modifier,
+            'top_items': [dict(item) for item in top_items]
+        }), 200
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/api/change-username', methods=['POST'])
 def change_username():
