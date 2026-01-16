@@ -120,20 +120,19 @@ function displayProfile(data) {
     const topItemsDiv = document.getElementById('profile-top-items');
     if (data.top_items && data.top_items.length > 0) {
         topItemsDiv.innerHTML = data.top_items.map(item => {
-            const modifierText = item.modifier ? `${item.modifier} ` : '';
             const gradients = {
                 'Holographic': 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%)',
                 'Polychrome': 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
                 'Negative': 'linear-gradient(135deg, #2c3e50 0%, #000000 100%)',
                 'Developer': 'linear-gradient(135deg, #FFD700 0%, #FF8C00 50%, #FF1493 100%)'
             };
-            const gradient = item.modifier ? gradients[item.modifier] : '';
-            const gradientStyle = gradient ? `background: ${gradient}; -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold;` : '';
+            const gradient = item.modifier ? gradients[item.modifier] : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            const rarityText = item.modifier ? `${item.modifier} 1 in ${item.rarity.toLocaleString()}` : `1 in ${item.rarity.toLocaleString()}`;
             
             return `
-                <div class="profile-inventory-item">
-                    <span class="profile-rarity-badge" style="${gradientStyle}">${modifierText}1 in ${item.rarity.toLocaleString()}</span>
-                    <span class="profile-count-badge">x${item.count}</span>
+                <div class="inventory-item">
+                    <span class="rarity-badge" style="background: ${gradient};">${rarityText}</span>
+                    <span class="count-badge">x ${item.count}</span>
                 </div>
             `;
         }).join('');
