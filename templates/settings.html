@@ -75,21 +75,14 @@ async function loadUserStats() {
                 const modifierText = data.rarest_modifier ? `${data.rarest_modifier} ` : '';
                 rarestDiv.textContent = `${modifierText}1 in ${data.rarest_rarity.toLocaleString()}`;
                 
-                // Apply gradient if modifier exists
+                // Apply text gradient class if modifier exists
+                rarestDiv.className = 'stat-value';
                 if (data.rarest_modifier) {
-                    const gradients = {
-                        'Holographic': 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%)',
-                        'Polychrome': 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
-                        'Negative': 'linear-gradient(135deg, #2c3e50 0%, #000000 100%)',
-                        'Developer': 'linear-gradient(135deg, #FFD700 0%, #FF8C00 50%, #FF1493 100%)'
-                    };
-                    rarestDiv.style.background = gradients[data.rarest_modifier] || '';
-                    rarestDiv.style.webkitBackgroundClip = 'text';
-                    rarestDiv.style.webkitTextFillColor = 'transparent';
-                    rarestDiv.style.fontWeight = 'bold';
+                    rarestDiv.classList.add(`text-gradient-${data.rarest_modifier.toLowerCase()}`);
                 }
             } else {
                 rarestDiv.textContent = 'No items yet';
+                            rarestDiv.className = 'stat-value';
             }
         }
     } catch (error) {

@@ -262,7 +262,7 @@ function displayInventory(inventory) {
         rarityBadge.className = 'rarity-badge';
         
         if (item.modifier) {
-            rarityBadge.style.background = item.modifier.gradient;
+            rarityBadge.classList.add(`modifier-${item.modifier.name.toLowerCase()}`);
             rarityBadge.textContent = `${item.modifier.name} 1 in ${item.rarity}`;
         } else {
             rarityBadge.textContent = `1 in ${item.rarity}`;
