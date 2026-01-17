@@ -305,8 +305,13 @@ function startCooldown(seconds) {
         clearInterval(cooldownInterval);
     }
     
-    // Clamp seconds to max 10 and apply modulo
-    seconds = Math.min(seconds % 10, 10);
+    // If seconds > 10 (clock skew), apply modulo to wrap it. If it's 0 after modulo, use 10.
+    if (seconds > 10) {
+        seconds = seconds % 10 || 10;
+    }
+    // Clamp to max 10
+    seconds = Math.min(Math.max(seconds, 0), 10);
+    
     if (seconds <= 0) {
         button.disabled = false;
         cooldownDisplay.textContent = '';

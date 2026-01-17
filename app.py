@@ -199,17 +199,23 @@ def roll():
         # Enforce cooldown strictly
         if last_roll is not None:
             time_since_last_roll = current_time - float(last_roll)
-            # Reject if within cooldown period (no clock skew tolerance)
-            if time_since_last_roll < cooldown_seconds:
+            
+            # Handle clock skew: if negative or > 1 hour, reset timestamp
+            if time_since_last_roll < 0 or time_since_last_roll > 3600:
+                # Clock skew detected - reset last_roll_time and allow roll
+                cur.execute('UPDATE users SET last_roll_time = %s WHERE id = %s', (current_time, user_id))
+                conn.commit()
+            # Reject if within cooldown period
+            elif time_since_last_roll < cooldown_seconds:
                 remaining = cooldown_seconds - time_since_last_roll
-                # Clamp remaining to [0, cooldown_seconds] to prevent negative values
+                # Clamp remaining to [0, cooldown_seconds]
                 remaining = max(0, min(remaining, cooldown_seconds))
                 conn.rollback()  # Release the lock
                 return jsonify({'error': 'Cooldown active', 'remaining': remaining}), 429
-        
-        # Update last roll time FIRST and commit to prevent spam
-        cur.execute('UPDATE users SET last_roll_time = %s WHERE id = %s', (current_time, user_id))
-        conn.commit()
+        else:
+            # First roll - set timestamp
+            cur.execute('UPDATE users SET last_roll_time = %s WHERE id = %s', (current_time, user_id))
+            conn.commit()
         
         # Now calculate RNG result (after timestamp is committed)
         base_rarity = calculate_rng_result()
