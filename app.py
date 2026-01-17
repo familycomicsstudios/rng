@@ -185,30 +185,36 @@ def roll():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        cur.execute('SELECT last_roll_time FROM users WHERE id = %s', (user_id,))
+        # Use SELECT FOR UPDATE to lock the row and prevent race conditions
+        cur.execute('SELECT last_roll_time FROM users WHERE id = %s FOR UPDATE', (user_id,))
         user = cur.fetchone()
         
-        # Check cooldown (10 seconds)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Check cooldown (10 seconds) - STRICT enforcement
         cooldown_seconds = 10
         last_roll = user['last_roll_time']
         
-        # If last_roll is None or cooldown has passed, allow the roll
-        # If last_roll is set, enforce cooldown with modulo to handle skew
+        # Enforce cooldown strictly
         if last_roll is not None:
             time_since_last_roll = current_time - float(last_roll)
-            # Only enforce when time has progressed; handle negative skew by allowing roll
-            if time_since_last_roll >= 0 and time_since_last_roll < cooldown_seconds:
-                # Modulo to cap remaining within [0, cooldown_seconds)
-                remaining = (cooldown_seconds - time_since_last_roll) % cooldown_seconds
+            # Reject if within cooldown period (no clock skew tolerance)
+            if time_since_last_roll < cooldown_seconds:
+                remaining = cooldown_seconds - time_since_last_roll
+                # Clamp remaining to [0, cooldown_seconds] to prevent negative values
+                remaining = max(0, min(remaining, cooldown_seconds))
+                conn.rollback()  # Release the lock
                 return jsonify({'error': 'Cooldown active', 'remaining': remaining}), 429
-            
-        # Calculate RNG result
+        
+        # Update last roll time FIRST and commit to prevent spam
+        cur.execute('UPDATE users SET last_roll_time = %s WHERE id = %s', (current_time, user_id))
+        conn.commit()
+        
+        # Now calculate RNG result (after timestamp is committed)
         base_rarity = calculate_rng_result()
         modifier_name, multiplier, gradient = calculate_modifier()
         true_rarity = base_rarity * multiplier
-        
-        # Update last roll time
-        cur.execute('UPDATE users SET last_roll_time = %s WHERE id = %s', (current_time, user_id))
         
         # Add to inventory - handle NULL modifier comparison properly
         if modifier_name:
@@ -303,9 +309,24 @@ def get_cooldown():
     # If last_roll is set, compute remaining with modulo and handle skew
     if last_roll is not None:
         time_since_last_roll = current_time - float(last_roll)
-        # Only show cooldown when time has progressed; negative skew -> no cooldown
+        
+        # If cooldown is showing > 10s (clock skew), reset it
+        if time_since_last_roll < 0 or time_since_last_roll > cooldown_seconds:
+            # Reset the last_roll_time to allow immediate roll
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('UPDATE users SET last_roll_time = NULL WHERE id = %s', (user_id,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return jsonify({'on_cooldown': False, 'remaining': 0}), 200
+        
+        # Only show cooldown when within the 10s window
         if time_since_last_roll >= 0 and time_since_last_roll < cooldown_seconds:
-            remaining = (cooldown_seconds - time_since_last_roll) % cooldown_seconds
+            remaining = cooldown_seconds - time_since_last_roll
+            # Clamp remaining to [0, cooldown_seconds] and apply modulo
+            remaining = (remaining % cooldown_seconds) if remaining > 0 else 0
+            remaining = min(remaining, cooldown_seconds)
             return jsonify({'on_cooldown': True, 'remaining': remaining}), 200
     
     return jsonify({'on_cooldown': False, 'remaining': 0}), 200

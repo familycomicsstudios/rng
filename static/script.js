@@ -305,6 +305,14 @@ function startCooldown(seconds) {
         clearInterval(cooldownInterval);
     }
     
+    // Clamp seconds to max 10 and apply modulo
+    seconds = Math.min(seconds % 10, 10);
+    if (seconds <= 0) {
+        button.disabled = false;
+        cooldownDisplay.textContent = '';
+        return;
+    }
+    
     const endTime = Date.now() + (seconds * 1000);
     
     const updateCooldown = () => {
@@ -322,7 +330,9 @@ function startCooldown(seconds) {
                 }, 100);
             }
         } else {
-            cooldownDisplay.textContent = `Cooldown: ${remaining.toFixed(1)}s`;
+            // Clamp display to max 10s
+            const displayRemaining = Math.min(remaining, 10);
+            cooldownDisplay.textContent = `Cooldown: ${displayRemaining.toFixed(1)}s`;
         }
     };
     
